@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Gold Production Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #FFD700, #FFA500, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.5);
+        }
+
+        .year-control {
+            display: none;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .year-control.active {
+            display: flex;
+        }
+
+        .year-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            background: rgba(255, 215, 0, 0.2);
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .year-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: radial-gradient(circle, #FFD700, #FFA500);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+        }
+
+        .year-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #FFD700;
+            min-width: 100px;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .play-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .play-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .play-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .play-button.playing {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+
+        .speed-label {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .speed-slider {
+            width: 100px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #FFD700;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .speed-display {
+            color: #FFD700;
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        #visualization {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 20px;
+            min-height: 600px;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            position: relative;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 15px;
+            background: rgba(20, 20, 30, 0.95);
+            border: 2px solid #FFD700;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            display: none;
+            max-width: 350px;
+        }
+
+        .tooltip h3 {
+            color: #FFD700;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            gap: 20px;
+        }
+
+        .tooltip-label {
+            color: #888;
+        }
+
+        .tooltip-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .production-animation {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .gold-bars-container {
+            display: flex;
+            gap: 3px;
+            margin: 10px 0;
+            height: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .gold-bar {
+            width: 30px;
+            height: 25px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            border-radius: 3px;
+            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+            opacity: 0;
+            animation: fadeInBar 0.3s forwards;
+        }
+
+        @keyframes fadeInBar {
+            to {
+                opacity: 1;
+                transform: scale(1.1) translateY(-2px);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #FFD700;
+        }
+
+        .bubble {
+            cursor: pointer;
+        }
+
+        .bubble:hover circle {
+            stroke-width: 3 !important;
+            filter: brightness(1.2);
+        }
+
+        .bubble text {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .production-rate-text {
+            text-align: center;
+            margin-top: 5px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .warning-text {
+            color: #FFA500;
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 165, 0, 0.1);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚜️ Global Gold Production Visualizer ⚜️</h1>
+            <p class="subtitle">Interactive Bubble Visualization of Gold Mining History (1975-2023)</p>
+        </div>
+
+        <div class="controls">
+            <div class="upload-section">
+                <div class="file-input-wrapper">
+                    <input type="file" id="csvFile" class="file-input" accept=".csv">
+                    <label for="csvFile" class="file-label">📊 Upload Gold Production CSV</label>
+                </div>
+                <p style="margin-top: 10px; color: #888;">Upload your CSV file with Entity, Year, and Production data</p>
+            </div>
+
+            <div class="year-control" id="yearControl">
+                <div class="play-controls">
+                    <button class="play-button" id="playButton">▶️ Play</button>
+                    <div class="speed-control">
+                        <span class="speed-label">Speed:</span>
+                        <input type="range" id="speedSlider" class="speed-slider" min="0.5" max="3" value="1" step="0.5">
+                        <span class="speed-display" id="speedDisplay">1x</span>
+                    </div>
+                </div>
+                <input type="range" id="yearSlider" class="year-slider" min="1975" max="2023" value="2023">
+                <div class="year-display" id="yearDisplay">2023</div>
+            </div>
+
+            <div class="stats-grid" id="statsGrid" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalProduction">-</div>
+                    <div class="stat-label">Total Production (tonnes)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="topProducer">-</div>
+                    <div class="stat-label">Top Producer</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="countriesCount">-</div>
+                    <div class="stat-label">Active Countries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="ouncesPerSecond">-</div>
+                    <div class="stat-label">Oz/Second (Global)</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="visualization">
+            <div class="loading">
+                <p>Upload a CSV file to begin visualization</p>
+            </div>
+        </div>
+
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let goldData = new Map();
+        let currentYear = 2023;
+        let isPlaying = false;
+        let playInterval;
+        let playSpeed = 1;
+        let svg;
+        let simulation;
+
+        // Constants
+        const TONNES_TO_OUNCES = 35274;
+        const SECONDS_PER_YEAR = 31536000;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('csvFile').addEventListener('change', handleFileUpload);
+            
+            document.getElementById('yearSlider').addEventListener('input', function(e) {
+                currentYear = parseInt(e.target.value);
+                document.getElementById('yearDisplay').textContent = currentYear;
+                updateVisualization();
+            });
+
+            document.getElementById('speedSlider').addEventListener('input', function(e) {
+                playSpeed = parseFloat(e.target.value);
+                document.getElementById('speedDisplay').textContent = playSpeed + 'x';
+                
+                // If currently playing, restart with new speed
+                if (isPlaying) {
+                    clearInterval(playInterval);
+                    startPlaying();
+                }
+            });
+
+            document.getElementById('playButton').addEventListener('click', togglePlay);
+        });
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            console.log('Loading file:', file.name);
+
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    console.log('Parsed rows:', results.data.length);
+                    processData(results.data);
+                },
+                error: function(error) {
+                    console.error('Parse error:', error);
+                    alert('Error parsing CSV: ' + error.message);
+                }
+            });
+        }
+
+        function processData(data) {
+            goldData.clear();
+            
+            let minYear = Infinity;
+            let maxYear = -Infinity;
+            let dataCount = 0;
+            
+            data.forEach(row => {
+                const country = row.Entity || row.Country || row.country;
+                const year = parseInt(row.Year || row.year);
+                const production = parseFloat(row['production|Gold|Mine|tonnes']) || 0;
+                
+                // Skip "World" aggregate data and focus on country-level data
+                if (country && country !== 'World' && year && !isNaN(year) && !isNaN(production) && production > 0) {
+                    if (!goldData.has(country)) {
+                        goldData.set(country, new Map());
+                    }
+                    goldData.get(country).set(year, production);
+                    
+                    minYear = Math.min(minYear, year);
+                    maxYear = Math.max(maxYear, year);
+                    dataCount++;
+                }
+            });
+
+            console.log(`Processed ${dataCount} data points`);
+            console.log(`Countries: ${goldData.size}`);
+            console.log(`Year range: ${minYear} - ${maxYear}`);
+
+            if (goldData.size === 0) {
+                alert('No valid country-level data found in CSV.');
+                return;
+            }
+
+            // Start from 1975 where country data begins
+            minYear = Math.max(minYear, 1975);
+            
+            // Update UI
+            const slider = document.getElementById('yearSlider');
+            slider.min = minYear;
+            slider.max = maxYear;
+            slider.value = maxYear;
+            currentYear = maxYear;
+            document.getElementById('yearDisplay').textContent = maxYear;
+            
+            // Show controls
+            document.getElementById('yearControl').classList.add('active');
+            document.getElementById('statsGrid').style.display = 'grid';
+            
+            // Initialize visualization
+            updateVisualization();
+        }
+
+        function getYearData(year) {
+            const yearData = [];
+            let worldTotal = 0;
+
+            goldData.forEach((countryData, country) => {
+                if (countryData.has(year)) {
+                    const production = countryData.get(year);
+                    if (production > 0) {
+                        yearData.push({ country, production });
+                        worldTotal += production;
+                    }
+                }
+            });
+
+            // Calculate percentages and rates
+            yearData.forEach(d => {
+                d.percentage = worldTotal > 0 ? (d.production / worldTotal) * 100 : 0;
+                d.ouncesPerSecond = (d.production * TONNES_TO_OUNCES / SECONDS_PER_YEAR);
+                d.ouncesPerMinute = d.ouncesPerSecond * 60;
+                d.secondsPerOunce = d.ouncesPerSecond > 0 ? (1 / d.ouncesPerSecond) : Infinity;
+            });
+
+            // Sort by production
+            yearData.sort((a, b) => b.production - a.production);
+
+            return yearData;
+        }
+
+        function updateVisualization() {
+            const yearData = getYearData(currentYear);
+            
+            if (yearData.length === 0) {
+                document.getElementById('visualization').innerHTML = `
+                    <div class="loading">
+                        <p style="color: #f44336;">No data available for year ${currentYear}</p>
+                        <p style="color: #888; font-size: 14px;">Country-level data starts from 1975</p>
+                    </div>
+                `;
+                updateStatistics(yearData);
+                return;
+            }
+            
+            createBubbleChart(yearData);
+            updateStatistics(yearData);
+        }
+
+        function createBubbleChart(yearData) {
+            const viz = document.getElementById('visualization');
+            viz.innerHTML = '';
+
+            const width = viz.offsetWidth - 40;
+            const height = 560;
+
+            svg = d3.select('#visualization')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            // Take top countries (max 40 for readability)
+            const maxBubbles = 40;
+            const dataToShow = yearData.slice(0, maxBubbles);
+
+            // Size scale for bubbles
+            const maxProduction = d3.max(dataToShow, d => d.production);
+            const sizeScale = d3.scaleSqrt()
+                .domain([0, maxProduction])
+                .range([10, 70]);
+
+            const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+                .domain([0, maxProduction]);
+
+            // Create force simulation
+            simulation = d3.forceSimulation(dataToShow)
+                .force('x', d3.forceX(width / 2).strength(0.05))
+                .force('y', d3.forceY(height / 2).strength(0.05))
+                .force('collide', d3.forceCollide(d => sizeScale(d.production) + 2));
+
+            // Create bubble groups
+            const bubbles = svg.selectAll('.bubble')
+                .data(dataToShow)
+                .enter().append('g')
+                .attr('class', 'bubble');
+
+            // Add circles
+            bubbles.append('circle')
+                .attr('r', d => sizeScale(d.production))
+                .attr('fill', d => colorScale(d.production))
+                .attr('stroke', '#FFD700')
+                .attr('stroke-width', 1)
+                .attr('opacity', 0)
+                .transition()
+                .duration(500)
+                .attr('opacity', 0.9);
+
+            // Add country labels
+            bubbles.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em')
+                .style('fill', '#000')
+                .style('font-size', d => {
+                    const radius = sizeScale(d.production);
+                    const maxLength = d.country.length;
+                    return `${Math.min(radius / (maxLength * 0.4), 14)}px`;
+                })
+                .style('font-weight', 'bold')
+                .text(d => {
+                    // Abbreviate long country names
+                    if (d.country.length > 15) {
+                        return d.country.substring(0, 12) + '...';
+                    }
+                    return d.country;
+                });
+
+            // Add hover interactions
+            bubbles
+                .on('mouseover', function(event, d) {
+                    showTooltip(event, d);
+                })
+                .on('mousemove', function(event) {
+                    moveTooltip(event);
+                })
+                .on('mouseout', hideTooltip);
+
+            // Run simulation
+            simulation.on('tick', () => {
+                bubbles.attr('transform', d => {
+                    // Keep bubbles within bounds
+                    const radius = sizeScale(d.production);
+                    d.x = Math.max(radius, Math.min(width - radius, d.x));
+                    d.y = Math.max(radius + 30, Math.min(height - radius, d.y));
+                    return `translate(${d.x},${d.y})`;
+                });
+            });
+
+            // Title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', 20)
+                .attr('text-anchor', 'middle')
+                .style('fill', '#FFD700')
+                .style('font-size', '20px')
+                .style('font-weight', 'bold')
+                .text(`Gold Production - ${currentYear}`);
+        }
+
+        function updateStatistics(yearData) {
+            const totalProduction = yearData.reduce((sum, d) => sum + d.production, 0);
+            const topProducer = yearData[0] || { country: '-', production: 0 };
+            const countriesCount = yearData.length;
+            const ouncesPerSecond = totalProduction * TONNES_TO_OUNCES / SECONDS_PER_YEAR;
+
+            document.getElementById('totalProduction').textContent = totalProduction.toFixed(0);
+            document.getElementById('topProducer').textContent = topProducer.country;
+            document.getElementById('countriesCount').textContent = countriesCount;
+            document.getElementById('ouncesPerSecond').textContent = ouncesPerSecond.toFixed(2);
+        }
+
+        function showTooltip(event, data) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.display = 'block';
+            
+            // Calculate animation timing based on seconds per ounce
+            // If it takes 0.5 seconds to produce an ounce, new bar every 0.1 seconds (5 bars = 1 ounce)
+            // If it takes 2 seconds to produce an ounce, new bar every 0.4 seconds
+            const secondsPerOunce = data.secondsPerOunce;
+            const barsPerOunce = 5; // 5 bars represent 1 ounce
+            const delayPerBar = (secondsPerOunce / barsPerOunce) * 1000; // Convert to milliseconds
+            
+            // Limit the delay to reasonable values (between 50ms and 2000ms)
+            const animationDelay = Math.max(50, Math.min(2000, delayPerBar));
+            
+            // Create gold bars animation with variable timing
+            const totalBars = 10;
+            let goldBarsHtml = '<div class="gold-bars-container">';
+            for (let i = 0; i < totalBars; i++) {
+                goldBarsHtml += `<div class="gold-bar" style="animation-delay: ${i * animationDelay}ms"></div>`;
+            }
+            goldBarsHtml += '</div>';
+            
+            // Format the production rate text
+            let productionRateText = '';
+            if (secondsPerOunce < 1) {
+                productionRateText = `${(1/secondsPerOunce).toFixed(1)} ounces per second!`;
+            } else if (secondsPerOunce < 60) {
+                productionRateText = `1 ounce every ${secondsPerOunce.toFixed(1)} seconds`;
+            } else if (secondsPerOunce < 3600) {
+                productionRateText = `1 ounce every ${(secondsPerOunce/60).toFixed(1)} minutes`;
+            } else {
+                productionRateText = `1 ounce every ${(secondsPerOunce/3600).toFixed(1)} hours`;
+            }
+            
+            tooltip.innerHTML = `
+                <h3>${data.country}</h3>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Production:</span>
+                    <span class="tooltip-value">${data.production.toFixed(1)} tonnes</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">World Share:</span>
+                    <span class="tooltip-value">${data.percentage.toFixed(2)}%</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Per Second:</span>
+                    <span class="tooltip-value">${data.ouncesPerSecond.toFixed(3)} oz</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Per Minute:</span>
+                    <span class="tooltip-value">${data.ouncesPerMinute.toFixed(1)} oz</span>
+                </div>
+                <div class="production-animation">
+                    ${goldBarsHtml}
+                    <div class="production-rate-text">
+                        ${productionRateText}
+                    </div>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
+                        Each bar appears every ${(animationDelay/1000).toFixed(2)}s (5 bars = 1 oz)
+                    </div>
+                </div>
+            `;
+        }
+
+        function moveTooltip(event) {
+            const tooltip = document.getElementById('tooltip');
+            const x = event.pageX;
+            const y = event.pageY;
+            
+            // Adjust position to keep tooltip on screen
+            const tooltipWidth = tooltip.offsetWidth;
+            const tooltipHeight = tooltip.offsetHeight;
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            let left = x + 10;
+            let top = y - 10;
+            
+            if (left + tooltipWidth > windowWidth - 20) {
+                left = x - tooltipWidth - 10;
+            }
+            
+            if (top + tooltipHeight > windowHeight - 20) {
+                top = y - tooltipHeight - 10;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                stopPlaying();
+            } else {
+                startPlaying();
+            }
+        }
+
+        function startPlaying() {
+            const button = document.getElementById('playButton');
+            const slider = document.getElementById('yearSlider');
+            
+            isPlaying = true;
+            button.textContent = '⏸️ Pause';
+            button.classList.add('playing');
+            
+            const minYear = parseInt(slider.min);
+            const maxYear = parseInt(slider.max);
+            
+            if (currentYear >= maxYear) {
+                currentYear = minYear;
+            }
+            
+            const baseDelay = 800; // Base delay in milliseconds
+            const adjustedDelay = baseDelay / playSpeed;
+            
+            playInterval = setInterval(() => {
+                currentYear++;
+                if (currentYear > maxYear) {
+                    currentYear = minYear;
+                }
+                slider.value = currentYear;
+                document.getElementById('yearDisplay').textContent = currentYear;
+                updateVisualization();
+            }, adjustedDelay);
+        }
+
+        function stopPlaying() {
+            const button = document.getElementById('playButton');
+            
+            isPlaying = false;
+            button.textContent = '▶️ Play';
+            button.classList.remove('playing');
+            clearInterval(playInterval);
+        }
+    </script>
+</body>
+</html>
