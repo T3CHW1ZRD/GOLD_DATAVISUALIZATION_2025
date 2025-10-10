@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>X / Gold vs Gold / X Dashboard</title>
+  <title>How Does Gold Perform in Comparison to Other Assets?</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
@@ -17,7 +17,14 @@
     h1 {
       text-align: center;
       color: gold;
-      margin-top: 0;
+      margin: 0 0 6px 0;
+    }
+    .subtitle {
+      text-align: center;
+      color: #ccc;
+      margin: 0 0 18px 0;
+      font-weight: normal;
+      font-size: 14px;
     }
     #uploader, #buttons, #toggle-container {
       text-align: center;
@@ -55,7 +62,8 @@
   </style>
 </head>
 <body>
-  <h1>Asset vs Gold — Toggle Comparison</h1>
+  <h1>How Does Gold Perform in Comparison to Other Assets?</h1>
+  <h2 class="subtitle">(Bitcoin / Oil (Brent / WTI) / S&amp;P500)</h2>
 
   <div id="uploader">
     <label for="csvFile">Upload your CSV:</label>
@@ -74,7 +82,7 @@
   </div>
 
   <div id="desc" class="description">
-    <strong>BTC / Gold</strong> shows how many ounces of gold one BTC is worth.  
+    <strong>BTC / Gold</strong> shows how many ounces of gold one BTC is worth.<br>
     When it rises, <strong>BTC</strong> is gaining value relative to gold (BTC outperforms gold).
   </div>
 
@@ -85,6 +93,31 @@
     let currentAsset = "BITCOIN";
     let showingXOverGold = true;
 
+    // --- Auto-load CSV from same directory; keep uploader as fallback ---
+    const CSV_PATH = encodeURI("SP500 oil gold bitcoin.csv");
+
+    window.addEventListener("DOMContentLoaded", () => {
+      updateToggleButton();
+      fetch(CSV_PATH)
+        .then(res => {
+          if (!res.ok) throw new Error("CSV not found");
+          return res.text();
+        })
+        .then(text => {
+          const results = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+          parsedData = results.data;
+          // Hide uploader if auto-load worked
+          const up = document.getElementById("uploader");
+          if (up) up.style.display = "none";
+          plotChart();
+        })
+        .catch(err => {
+          // Leave uploader visible so the user can upload manually
+          console.warn("Auto-load failed, showing uploader.", err);
+        });
+    });
+
+    // --- Asset selection buttons ---
     const buttons = document.querySelectorAll("button[data-asset]");
     buttons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -95,12 +128,19 @@
       });
     });
 
+    // --- Toggle X/Gold vs Gold/X ---
     document.getElementById("toggleBtn").addEventListener("click", () => {
       showingXOverGold = !showingXOverGold;
       updateToggleButton();
       if (parsedData.length) plotChart();
     });
 
+    function updateToggleButton() {
+      const btn = document.getElementById("toggleBtn");
+      btn.textContent = showingXOverGold ? "Show: X / Gold" : "Show: Gold / X";
+    }
+
+    // --- Manual upload fallback ---
     document.getElementById("csvFile").addEventListener("change", function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -115,11 +155,7 @@
       });
     });
 
-    function updateToggleButton() {
-      const btn = document.getElementById("toggleBtn");
-      btn.textContent = showingXOverGold ? "Show: X / Gold" : "Show: Gold / X";
-    }
-
+    // --- Chart logic (kept same) ---
     function plotChart() {
       const daily = [];
       parsedData.forEach(row => {
@@ -136,6 +172,8 @@
       });
 
       daily.sort((a, b) => a.date - b.date);
+
+      // Bucket into months
       const monthly = {};
       daily.forEach(d => {
         const key = d.date.getFullYear() + "-" + String(d.date.getMonth() + 1).padStart(2, "0");
@@ -144,6 +182,7 @@
       });
 
       const months = Object.keys(monthly).sort();
+
       const createCandlestick = (field) => {
         const open = [], high = [], low = [], close = [];
         months.forEach(m => {
@@ -195,12 +234,12 @@
       const desc = document.getElementById("desc");
       if (showingXOverGold) {
         desc.innerHTML = `
-          <strong>${shortName} / Gold</strong> shows how many ounces of gold one ${shortName} is worth.  
+          <strong>${shortName} / Gold</strong> shows how many ounces of gold one ${shortName} is worth.<br>
           When it rises, <strong>${shortName}</strong> is gaining value relative to gold (${shortName} outperforms gold).
         `;
       } else {
         desc.innerHTML = `
-          <strong>Gold / ${shortName}</strong> shows how much ${shortName} one ounce of gold can buy.  
+          <strong>Gold / ${shortName}</strong> shows how much ${shortName} one ounce of gold can buy.<br>
           When it rises, <strong>gold</strong> is gaining value relative to ${shortName} (gold outperforms ${shortName}).
         `;
       }
