@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Gold Production Visualizer</title>
+    <title>Who Makes Our Gold?</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -335,7 +335,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚜️ Global Gold Production Visualizer ⚜️</h1>
+            <h1>Who Makes Our Gold?</h1>
             <p class="subtitle">Interactive Bubble Visualization of Gold Mining History (1975-2023)</p>
         </div>
 
@@ -406,6 +406,32 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            // Try to auto-load CSV from same directory
+            const CSV_PATH = encodeURI('gold-production.csv');
+            fetch(CSV_PATH)
+                .then(res => {
+                    if (!res.ok) throw new Error('CSV not found');
+                    return res.text();
+                })
+                .then(text => {
+                    const results = Papa.parse(text, {
+                        header: true,
+                        dynamicTyping: true,
+                        skipEmptyLines: true
+                    });
+                    processData(results.data);
+                    // Hide uploader when auto-load succeeds
+                    const up = document.getElementById('csvFile');
+                    if (up) {
+                        const wrapper = up.closest('.upload-section');
+                        if (wrapper) wrapper.style.display = 'none';
+                    }
+                })
+                .catch(err => {
+                    // If auto-load fails, keep uploader visible
+                    console.warn('Auto-load failed, please upload manually.', err);
+                });
+
             document.getElementById('csvFile').addEventListener('change', handleFileUpload);
             
             document.getElementById('yearSlider').addEventListener('input', function(e) {
@@ -664,8 +690,6 @@
             tooltip.style.display = 'block';
             
             // Calculate animation timing based on seconds per ounce
-            // If it takes 0.5 seconds to produce an ounce, new bar every 0.1 seconds (5 bars = 1 ounce)
-            // If it takes 2 seconds to produce an ounce, new bar every 0.4 seconds
             const secondsPerOunce = data.secondsPerOunce;
             const barsPerOunce = 5; // 5 bars represent 1 ounce
             const delayPerBar = (secondsPerOunce / barsPerOunce) * 1000; // Convert to milliseconds
