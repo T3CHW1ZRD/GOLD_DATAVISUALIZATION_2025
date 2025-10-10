@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gold Reserves Map</title>
+    <title>How Have Gold Holdings Changed in Each Country?</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -165,11 +166,7 @@
 <body>
     <div id="container">
         <h1>Gold Reserves by Country</h1>
-        <div id="fileUpload" style="text-align: center; padding: 20px;">
-            <label for="csvFile" style="font-size: 16px; margin-right: 10px;">Upload CSV:</label>
-            <input type="file" id="csvFile" accept=".csv" style="padding: 8px;">
-        </div>
-        <div id="loading" style="display: none;">Processing data...</div>
+        <div id="loading">Loading gold data...</div>
         <div id="controls" style="display: none;">
             <div id="timeDisplay">Loading...</div>
             <input type="range" id="timeSlider" min="0" max="100" value="0">
@@ -203,298 +200,63 @@
         let isPlaying = false;
         let playInterval;
         let playSpeed = 500;
-        
+
         const width = 1360;
         const height = 600;
-        
+
         const svg = d3.select("#map")
             .attr("width", width)
             .attr("height", height);
-        
+
         const projection = d3.geoMercator()
             .scale(200)
             .translate([width / 2, height / 1.5]);
-        
+
         const path = d3.geoPath().projection(projection);
-        
+
         const colorScale = d3.scaleThreshold()
             .domain([10, 100, 500, 1000, 3000, 8000])
             .range(["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c"]);
-        
+
         const tooltip = d3.select("#tooltip");
-        
-        // Comprehensive IMF to GeoJSON country name mappings
-        const countryNameMap = {
-            "Afghanistan, Islamic Republic of": "Afghanistan",
-            "Afghanistan, Islamic Rep. of": "Afghanistan",
-            "Albania": "Albania",
-            "Algeria": "Algeria",
-            "Argentina": "Argentina",
-            "Armenia, Republic of": "Armenia",
-            "Armenia, Rep. of": "Armenia",
-            "Aruba": "Aruba",
-            "Australia": "Australia",
-            "Austria": "Austria",
-            "Azerbaijan, Republic of": "Azerbaijan",
-            "Azerbaijan, Rep. of": "Azerbaijan",
-            "Bahamas, The": "Bahamas",
-            "Bahrain, Kingdom of": "Bahrain",
-            "Bangladesh": "Bangladesh",
-            "Barbados": "Barbados",
-            "Belarus, Republic of": "Belarus",
-            "Belarus": "Belarus",
-            "Belarus, Rep. of4)": "Belarus",
-            "Belgium": "Belgium",
-            "Belize": "Belize",
-            "Benin": "Benin",
-            "Bhutan": "Bhutan",
-            "Bolivia": "Bolivia",
-            "Bosnia and Herzegovina": "Bosnia and Herz.",
-            "Botswana": "Botswana",
-            "Brazil": "Brazil",
-            "Brunei Darussalam": "Brunei",
-            "Bulgaria": "Bulgaria",
-            "Burkina Faso": "Burkina Faso",
-            "Burundi": "Burundi",
-            "Cabo Verde": "Cape Verde",
-            "Cambodia": "Cambodia",
-            "Cameroon": "Cameroon",
-            "Canada": "Canada",
-            "Central African Republic": "Central African Rep.",
-            "Chad": "Chad",
-            "Chile": "Chile",
-            "China, People's Republic of": "China",
-            "China, P.R.: Mainland": "China",
-            "Colombia": "Colombia",
-            "Comoros": "Comoros",
-            "Congo, Democratic Republic of": "Dem. Rep. Congo",
-            "Congo, Republic of": "Congo",
-            "Costa Rica": "Costa Rica",
-            "Côte d'Ivoire": "Côte d'Ivoire",
-            "Ivory Coast": "Côte d'Ivoire",
-            "Croatia": "Croatia",
-            "Cyprus": "Cyprus",
-            "Czech Republic": "Czechia",
-            "Denmark": "Denmark",
-            "Djibouti": "Djibouti",
-            "Dominica": "Dominica",
-            "Dominican Republic": "Dominican Rep.",
-            "Ecuador": "Ecuador",
-            "Egypt, Arab Republic of": "Egypt",
-            "Egypt": "Egypt",
-            "El Salvador": "El Salvador",
-            "Equatorial Guinea": "Eq. Guinea",
-            "Eritrea": "Eritrea",
-            "Estonia": "Estonia",
-            "Eswatini, Kingdom of": "eSwatini",
-            "Swaziland": "eSwatini",
-            "Ethiopia": "Ethiopia",
-            "Fiji": "Fiji",
-            "Finland": "Finland",
-            "France": "France",
-            "Gabon": "Gabon",
-            "Gambia, The": "Gambia",
-            "Georgia": "Georgia",
-            "Germany": "Germany",
-            "Ghana": "Ghana",
-            "Greece": "Greece",
-            "Guatemala": "Guatemala",
-            "Guinea": "Guinea",
-            "Guinea-Bissau": "Guinea-Bissau",
-            "Guyana": "Guyana",
-            "Haiti": "Haiti",
-            "Honduras": "Honduras",
-            "Hungary": "Hungary",
-            "Iceland": "Iceland",
-            "India": "India",
-            "Indonesia": "Indonesia",
-            "Iran, Islamic Republic of": "Iran",
-            "Iraq": "Iraq",
-            "Ireland": "Ireland",
-            "Israel": "Israel",
-            "Italy": "Italy",
-            "Jamaica": "Jamaica",
-            "Japan": "Japan",
-            "Jordan": "Jordan",
-            "Kazakhstan, Republic of": "Kazakhstan",
-            "Kazakhstan": "Kazakhstan",
-            "Kenya": "Kenya",
-            "Korea, Republic of": "South Korea",
-            "Kosovo, Republic of": "Kosovo",
-            "Kuwait": "Kuwait",
-            "Kyrgyz Republic": "Kyrgyzstan",
-            "Lao People's Democratic Republic": "Laos",
-            "Latvia": "Latvia",
-            "Lebanon": "Lebanon",
-            "Lesotho": "Lesotho",
-            "Liberia": "Liberia",
-            "Libya": "Libya",
-            "Lithuania": "Lithuania",
-            "Luxembourg": "Luxembourg",
-            "Madagascar": "Madagascar",
-            "Malawi": "Malawi",
-            "Malaysia": "Malaysia",
-            "Maldives": "Maldives",
-            "Mali": "Mali",
-            "Malta": "Malta",
-            "Mauritania": "Mauritania",
-            "Mauritius": "Mauritius",
-            "Mexico": "Mexico",
-            "Micronesia, Federated States of": "Micronesia",
-            "Moldova": "Moldova",
-            "Mongolia": "Mongolia",
-            "Montenegro": "Montenegro",
-            "Morocco": "Morocco",
-            "Mozambique": "Mozambique",
-            "Myanmar": "Myanmar",
-            "Burma": "Myanmar",
-            "Namibia": "Namibia",
-            "Nepal": "Nepal",
-            "Netherlands Antilles": "Netherlands",
-            "Netherlands, The": "Netherlands",
-            "New Zealand": "New Zealand",
-            "Nicaragua": "Nicaragua",
-            "Niger": "Niger",
-            "Nigeria": "Nigeria",
-            "North Macedonia, Republic of": "Macedonia",
-            "Macedonia, former Yugoslav Republic of": "Macedonia",
-            "Norway": "Norway",
-            "Oman": "Oman",
-            "Pakistan": "Pakistan",
-            "Panama": "Panama",
-            "Papua New Guinea": "Papua New Guinea",
-            "Paraguay": "Paraguay",
-            "Peru": "Peru",
-            "Philippines": "Philippines",
-            "Poland, Republic of": "Poland",
-            "Poland": "Poland",
-            "Portugal": "Portugal",
-            "Qatar": "Qatar",
-            "Romania": "Romania",
-            "Russian Federation": "Russia",
-            "Russia": "Russia",
-            "Rwanda": "Rwanda",
-            "Samoa": "Samoa",
-            "San Marino": "San Marino",
-            "Saudi Arabia": "Saudi Arabia",
-            "Senegal": "Senegal",
-            "Serbia, Republic of": "Serbia",
-            "Serbia": "Serbia",
-            "Seychelles": "Seychelles",
-            "Sierra Leone": "Sierra Leone",
-            "Singapore": "Singapore",
-            "Slovak Republic": "Slovakia",
-            "Slovenia": "Slovenia",
-            "Solomon Islands": "Solomon Is.",
-            "Somalia": "Somalia",
-            "South Africa": "South Africa",
-            "South Africa, Rep. of": "South Africa",
-            "South Sudan, Republic of": "S. Sudan",
-            "South Sudan": "S. Sudan",
-            "Spain": "Spain",
-            "Sri Lanka": "Sri Lanka",
-            "Sudan": "Sudan",
-            "Suriname": "Suriname",
-            "Sweden": "Sweden",
-            "Switzerland": "Switzerland",
-            "Syrian Arab Republic": "Syria",
-            "Syria": "Syria",
-            "Tajikistan": "Tajikistan",
-            "Tanzania, United Republic of": "Tanzania",
-            "Tanzania": "Tanzania",
-            "Thailand": "Thailand",
-            "Timor-Leste, Democratic Republic of": "Timor-Leste",
-            "Timor-Leste, Dem. Rep. of": "Timor-Leste",
-            "Togo": "Togo",
-            "Trinidad and Tobago": "Trinidad and Tobago",
-            "Tunisia": "Tunisia",
-            "Turkey": "Turkey",
-            "Turkey5)": "Turkey",
-            "Turkmenistan": "Turkmenistan",
-            "Uganda": "Uganda",
-            "Ukraine": "Ukraine",
-            "United Arab Emirates": "United Arab Emirates",
-            "UAE": "United Arab Emirates",
-            "United Kingdom": "United Kingdom",
-            "UK": "United Kingdom",
-            "United States": "United States of America",
-            "Uruguay": "Uruguay",
-            "Uzbekistan, Republic of": "Uzbekistan",
-            "Uzbekistan": "Uzbekistan",
-            "Vanuatu": "Vanuatu",
-            "Venezuela, Republica Bolivariana de": "Venezuela",
-            "Vietnam": "Vietnam",
-            "West Bank and Gaza": "Palestine",
-            "Yemen, Republic of": "Yemen",
-            "Yemen Arab Rep.": "Yemen",
-            "Yemen, P.D. Rep.": "Yemen",
-            "Zambia": "Zambia",
-            "Zimbabwe": "Zimbabwe",
-            "Taiwan Province of China": "Taiwan"
-        };
-        
-        function normalizeCountryName(name) {
-            return countryNameMap[name] || name;
-        }
-        
-        document.getElementById("csvFile").addEventListener("change", function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                document.getElementById("loading").style.display = "block";
-                document.getElementById("fileUpload").style.display = "none";
-                
-                Papa.parse(file, {
-                    header: true,
-                    dynamicTyping: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        processData(results.data);
-                    },
-                    error: function(error) {
-                        document.getElementById("loading").textContent = "Error parsing CSV file.";
-                        console.error(error);
-                    }
-                });
-            }
-        });
-        
+
+        // Simplified normalization (kept as in original)
+        const countryNameMap = { "United States": "United States of America" };
+        function normalizeCountryName(name) { return countryNameMap[name] || name; }
+
+        // Automatically load CSV from the same folder
+        fetch('gold_reserves_annual_quarterly_monthly.csv')
+            .then(res => res.text())
+            .then(csv => {
+                const parsed = Papa.parse(csv, { header: true, dynamicTyping: true, skipEmptyLines: true });
+                processData(parsed.data);
+            })
+            .catch(err => {
+                document.getElementById("loading").textContent = "Failed to load CSV.";
+                console.error(err);
+            });
+
         function processData(data) {
             const monthlyData = data.filter(d => d.period === 'month');
-            
             monthlyData.forEach(row => {
                 const period = row['Time Period'];
-                const countryRaw = row['Country Name'];
+                const country = normalizeCountryName(row['Country Name']);
                 const tonnes = row['tonnes'];
-                
-                // Skip Hong Kong and Macao to avoid overwriting Mainland China
-                if (countryRaw === 'China, P.R.: Hong Kong' || countryRaw === 'China, P.R.: Macao') {
-                    return;
-                }
-                
-                const country = normalizeCountryName(countryRaw);
-                
-                if (!goldData[period]) {
-                    goldData[period] = {};
-                }
+                if (!goldData[period]) goldData[period] = {};
                 goldData[period][country] = tonnes;
             });
-            
-            timePeriods = Object.keys(goldData).sort((a, b) => {
-                return new Date(a) - new Date(b);
-            });
-            
+
+            timePeriods = Object.keys(goldData).sort((a, b) => new Date(a) - new Date(b));
             document.getElementById("timeSlider").max = timePeriods.length - 1;
             currentPeriodIndex = timePeriods.length - 1;
             document.getElementById("timeSlider").value = currentPeriodIndex;
-            
             loadWorldMap();
         }
-        
+
         function loadWorldMap() {
             d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
-                .then(function(world) {
+                .then(world => {
                     const countries = topojson.feature(world, world.objects.countries);
-                    
                     svg.selectAll("path")
                         .data(countries.features)
                         .enter()
@@ -502,139 +264,61 @@
                         .attr("class", "country")
                         .attr("d", path)
                         .on("mouseover", handleMouseOver)
-                        .on("mouseout", handleMouseOut)
+                        .on("mouseout", () => tooltip.style("display", "none"))
                         .on("click", handleClick);
-                    
                     document.getElementById("loading").style.display = "none";
                     document.getElementById("controls").style.display = "block";
-                    
                     updateMap();
                     createLegend();
-                })
-                .catch(function(error) {
-                    d3.json("https://unpkg.com/world-atlas@2/countries-110m.json")
-                        .then(function(world) {
-                            const countries = topojson.feature(world, world.objects.countries);
-                            
-                            svg.selectAll("path")
-                                .data(countries.features)
-                                .enter()
-                                .append("path")
-                                .attr("class", "country")
-                                .attr("d", path)
-                                .on("mouseover", handleMouseOver)
-                                .on("mouseout", handleMouseOut)
-                                .on("click", handleClick);
-                            
-                            document.getElementById("loading").style.display = "none";
-                            document.getElementById("controls").style.display = "block";
-                            
-                            updateMap();
-                            createLegend();
-                        });
                 });
         }
-        
+
         function updateMap() {
             const currentPeriod = timePeriods[currentPeriodIndex];
             const currentData = goldData[currentPeriod] || {};
-            
-            const lastKnownValues = {};
-            for (let i = 0; i <= currentPeriodIndex; i++) {
-                const periodData = goldData[timePeriods[i]] || {};
-                Object.keys(periodData).forEach(country => {
-                    if (periodData[country] !== undefined && periodData[country] !== null) {
-                        lastKnownValues[country] = periodData[country];
-                    }
-                });
-            }
-            
             document.getElementById("timeDisplay").textContent = currentPeriod;
-            
+
             svg.selectAll("path")
                 .transition()
                 .duration(300)
-                .attr("fill", function(d) {
+                .attr("fill", d => {
                     const countryName = d.properties.name;
-                    let tonnes = currentData[countryName];
-                    if (tonnes === undefined || tonnes === null) {
-                        tonnes = lastKnownValues[countryName];
-                    }
-                    if (tonnes !== undefined && tonnes !== null) {
-                        return colorScale(tonnes);
-                    }
-                    return "#e0e0e0";
+                    const tonnes = currentData[countryName];
+                    return tonnes ? colorScale(tonnes) : "#e0e0e0";
                 });
         }
-        
+
         function handleMouseOver(event, d) {
             const countryName = d.properties.name;
             const currentPeriod = timePeriods[currentPeriodIndex];
-            const currentData = goldData[currentPeriod] || {};
-            
-            let tonnes = currentData[countryName];
-            let isLastKnown = false;
-            
-            if (!tonnes && tonnes !== 0) {
-                for (let i = currentPeriodIndex; i >= 0; i--) {
-                    const periodData = goldData[timePeriods[i]] || {};
-                    if (periodData[countryName] !== undefined && periodData[countryName] !== null) {
-                        tonnes = periodData[countryName];
-                        isLastKnown = true;
-                        break;
-                    }
-                }
-            }
-            
+            const tonnes = goldData[currentPeriod]?.[countryName];
             tooltip.style("display", "block")
-                .html(`<strong>${countryName}</strong><br/>
-                       ${tonnes !== undefined && tonnes !== null ? `Gold: ${tonnes.toFixed(2)} tonnes${isLastKnown ? ' (last known)' : ''}` : 'No data'}`)
+                .html(`<strong>${countryName}</strong><br/>${tonnes ? tonnes.toFixed(2) + ' tonnes' : 'No data'}`)
                 .style("left", (event.pageX + 10) + "px")
                 .style("top", (event.pageY - 10) + "px");
         }
-        
-        function handleMouseOut() {
-            tooltip.style("display", "none");
-        }
-        
+
         function handleClick(event, d) {
             const countryName = d.properties.name;
-            
             const historicalData = [];
             const labels = [];
-            
             timePeriods.forEach(period => {
-                if (goldData[period] && goldData[period][countryName] !== undefined && goldData[period][countryName] !== null) {
+                if (goldData[period]?.[countryName]) {
                     historicalData.push(goldData[period][countryName]);
                     labels.push(period);
                 }
             });
-            
-            if (historicalData.length === 0) {
-                return;
-            }
-            
-            document.getElementById('chartTitle').textContent = `${countryName} - Gold Reserves History`;
+            if (historicalData.length === 0) return;
+            document.getElementById('chartTitle').textContent = `${countryName} - Gold Reserves`;
             document.getElementById('chartModal').classList.add('show');
-            
-            const canvas = document.getElementById('historyChart');
-            const ctx = canvas.getContext('2d');
-            drawHistoryChart(ctx, historicalData, labels, countryName);
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            drawHistoryChart(ctx, historicalData, labels);
         }
-        
-        function drawHistoryChart(ctx, data, labels, countryName) {
-            const width = 740;
-            const height = 400;
-            const padding = 60;
-            const chartWidth = width - 2 * padding;
-            const chartHeight = height - 2 * padding;
-            
-            ctx.clearRect(0, 0, width, height);
-            
-            const maxValue = Math.max(...data);
-            const minValue = 0;
-            const range = maxValue || 1;
-            
+
+        function drawHistoryChart(ctx, data, labels) {
+            ctx.clearRect(0, 0, 740, 400);
+            const padding = 60, width = 740, height = 400, chartW = width - 2 * padding, chartH = height - 2 * padding;
+            const max = Math.max(...data);
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -642,67 +326,16 @@
             ctx.lineTo(padding, height - padding);
             ctx.lineTo(width - padding, height - padding);
             ctx.stroke();
-            
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 5; i++) {
-                const y = height - padding - (i / 5) * chartHeight;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(width - padding, y);
-                ctx.stroke();
-                
-                ctx.fillStyle = '#666';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'right';
-                ctx.fillText((maxValue * i / 5).toFixed(0) + ' t', padding - 10, y + 4);
-            }
-            
             ctx.strokeStyle = '#4CAF50';
-            ctx.lineWidth = 3;
             ctx.beginPath();
-            
-            data.forEach((value, i) => {
-                const x = padding + (i / (data.length - 1)) * chartWidth;
-                const y = height - padding - (value / range) * chartHeight;
-                
-                if (i === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
+            data.forEach((v, i) => {
+                const x = padding + (i / (data.length - 1)) * chartW;
+                const y = height - padding - (v / max) * chartH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
             });
-            
             ctx.stroke();
-            
-            ctx.fillStyle = '#4CAF50';
-            data.forEach((value, i) => {
-                const x = padding + (i / (data.length - 1)) * chartWidth;
-                const y = height - padding - (value / range) * chartHeight;
-                
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, 2 * Math.PI);
-                ctx.fill();
-            });
-            
-            ctx.fillStyle = '#666';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            
-            ctx.fillText(labels[0], padding, height - padding + 20);
-            
-            const midIndex = Math.floor(labels.length / 2);
-            const midX = padding + (midIndex / (data.length - 1)) * chartWidth;
-            ctx.fillText(labels[midIndex], midX, height - padding + 20);
-            
-            ctx.fillText(labels[labels.length - 1], width - padding, height - padding + 20);
-            
-            ctx.fillStyle = '#999';
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${data.length} data points from ${labels[0]} to ${labels[labels.length - 1]}`, width / 2, height - 10);
         }
-        
+
         function createLegend() {
             const legendData = [
                 { label: "0-10", color: "#ffffcc" },
@@ -714,92 +347,20 @@
                 { label: "8K+", color: "#e31a1c" },
                 { label: "No data", color: "#e0e0e0" }
             ];
-            
             const legend = d3.select("#legend");
-            
             legendData.forEach(item => {
-                const div = legend.append("div")
-                    .attr("class", "legend-item");
-                
-                div.append("div")
-                    .attr("class", "legend-color")
-                    .style("background-color", item.color);
-                
-                div.append("span")
-                    .text(`${item.label} tonnes`);
+                const div = legend.append("div").attr("class", "legend-item");
+                div.append("div").attr("class", "legend-color").style("background-color", item.color);
+                div.append("span").text(item.label + " tonnes");
             });
         }
-        
-        document.getElementById("timeSlider").addEventListener("input", function(e) {
-            currentPeriodIndex = parseInt(e.target.value);
-            updateMap();
-        });
-        
-        document.getElementById("playBtn").addEventListener("click", function() {
-            if (isPlaying) {
-                stopPlay();
-            } else {
-                startPlay();
-            }
-        });
-        
-        document.getElementById("prevBtn").addEventListener("click", function() {
-            if (currentPeriodIndex > 0) {
-                currentPeriodIndex--;
-                document.getElementById("timeSlider").value = currentPeriodIndex;
-                updateMap();
-            }
-        });
-        
-        document.getElementById("nextBtn").addEventListener("click", function() {
-            if (currentPeriodIndex < timePeriods.length - 1) {
-                currentPeriodIndex++;
-                document.getElementById("timeSlider").value = currentPeriodIndex;
-                updateMap();
-            }
-        });
-        
-        document.getElementById("speedSlider").addEventListener("input", function(e) {
-            playSpeed = parseInt(e.target.value);
-            document.getElementById("speedDisplay").textContent = (playSpeed / 1000).toFixed(1) + "s";
-            
-            if (isPlaying) {
-                stopPlay();
-                startPlay();
-            }
-        });
-        
-        function startPlay() {
-            isPlaying = true;
-            document.getElementById("playBtn").textContent = "Pause";
-            
-            playInterval = setInterval(function() {
-                if (currentPeriodIndex < timePeriods.length - 1) {
-                    currentPeriodIndex++;
-                    document.getElementById("timeSlider").value = currentPeriodIndex;
-                    updateMap();
-                } else {
-                    stopPlay();
-                }
-            }, playSpeed);
-        }
-        
-        function stopPlay() {
-            isPlaying = false;
-            document.getElementById("playBtn").textContent = "Play";
-            clearInterval(playInterval);
-        }
-        
-        document.getElementById("closeModal").addEventListener("click", function() {
+
+        document.getElementById("closeModal").addEventListener("click", () => {
             document.getElementById("chartModal").classList.remove("show");
         });
-        
-        document.getElementById("chartModal").addEventListener("click", function(e) {
-            if (e.target.id === "chartModal") {
-                document.getElementById("chartModal").classList.remove("show");
-            }
+        document.getElementById("chartModal").addEventListener("click", e => {
+            if (e.target.id === "chartModal") document.getElementById("chartModal").classList.remove("show");
         });
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 </body>
 </html>
